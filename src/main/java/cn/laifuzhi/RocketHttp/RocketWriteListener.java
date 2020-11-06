@@ -21,7 +21,9 @@ public final class RocketWriteListener implements ChannelFutureListener {
             promise.setFailure(future.cause());
             if (future.channel().isActive()) {
                 future.channel().pipeline().fireExceptionCaught(future.cause());
+                return;
             }
+            future.channel().attr(PROMISE).set(null);
         }
     }
 }
