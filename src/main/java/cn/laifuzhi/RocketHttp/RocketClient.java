@@ -4,6 +4,7 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -67,7 +68,7 @@ public final class RocketClient implements Closeable {
                     protected void initChannel(SocketChannel ch) {
                         ch.pipeline()
                                 // 10s主动关闭channel
-                                .addLast(new RocketIdleHandler(0, 0, 10))
+//                                .addLast(new RocketIdleHandler(0, 0, 10))
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(10 * 1024 * 1024))
                                 .addLast(new HttpContentDecompressor())
@@ -77,7 +78,7 @@ public final class RocketClient implements Closeable {
                 });
     }
 
-    public String execute(String host, int port, String uri) throws InterruptedException, ExecutionException {
+    public Promise<String> execute(String host, int port, String uri) throws InterruptedException, ExecutionException {
         if (isClosed.get()) {
             throw new RuntimeException("RocketClient already close");
         }
@@ -88,12 +89,13 @@ public final class RocketClient implements Closeable {
         headers.set(HttpHeaderNames.ACCEPT, "*/*");
 
         ChannelFuture connectFuture = bootstrap.connect(host, port);
-        Channel channel = connectFuture.channel();
-        Promise<String> promise = channel.eventLoop().newPromise();
+        Promise<String> promise = connectFuture.channel().eventLoop().newPromise();
+        connectFuture.addListener((ChannelFutureListener) channelFuture -> {
+            channelFuture.channel().writeAndFlush(httpRequest).addListener(new RocketWriteListener(promise));
+        });
         // 执行writeAndFlush时，如果channel已经关闭，则ChannelFutureListener中的channel pipeline已经没有自定义handler了
         // 所以单纯用FIRE_EXCEPTION_ON_FAILURE没有办法处理promise，因为RocketHandler已经没了
-        channel.writeAndFlush(httpRequest).addListener(new RocketWriteListener(promise));
-        return promise.get();
+        return promise;
     }
 
     @Override
