@@ -32,11 +32,6 @@ public final class RocketHandler extends SimpleChannelInboundHandler<FullHttpRes
         }
         promise.setSuccess(msg.content().toString(CharsetUtil.UTF_8));
         ctx.channel().attr(PROMISE).set(null);
-//        RocketChannelPool rocketChannelPool = context.getChannelPool();
-//        // 归还连接，连接池满了offer返回false则直接关闭连接
-//        if (!rocketChannelPool.offer(ctx.channel())) {
-//            ctx.close();
-//        }
     }
 
     @Override
