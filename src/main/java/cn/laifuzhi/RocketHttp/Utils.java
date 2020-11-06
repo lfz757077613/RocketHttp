@@ -7,7 +7,7 @@ import io.netty.channel.Channel;
 
 import java.util.List;
 
-public class Utils {
+public final class Utils {
     private static final Joiner JOINER_UNDERLINE = Joiner.on("_").skipNulls();
     private static final Joiner JOINER_COLON = Joiner.on(":").skipNulls();
     private static final Splitter SPLITTER_COLON = Splitter.on(":").trimResults().omitEmptyStrings();
