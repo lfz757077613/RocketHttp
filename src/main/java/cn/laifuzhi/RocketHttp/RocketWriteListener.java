@@ -8,10 +8,10 @@ import lombok.AllArgsConstructor;
 import static cn.laifuzhi.RocketHttp.RocketClient.PROMISE;
 
 /**
- * writeAndFlush发出http请求的listener，负责对channel绑定promise，并且处理请求异常
+ * 发出请求的listener，负责对channel绑定promise，并且处理请求异常
  */
 @AllArgsConstructor
-public final class RocketWriteListener implements ChannelFutureListener {
+public class RocketWriteListener implements ChannelFutureListener {
     private final Promise<String> promise;
 
     @Override

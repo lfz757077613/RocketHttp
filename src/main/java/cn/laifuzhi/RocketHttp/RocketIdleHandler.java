@@ -14,7 +14,7 @@ public final class RocketIdleHandler extends IdleStateHandler {
 
     @Override
     protected void channelIdle(ChannelHandlerContext ctx, IdleStateEvent evt) throws Exception {
-        log.debug("channelIdle channel:{}", ctx.channel().localAddress().toString() + ctx.channel().remoteAddress().toString());
+        log.warn("channelIdle channel:{}", ctx.channel().localAddress().toString() + ctx.channel().remoteAddress().toString());
         ctx.close();
     }
 }

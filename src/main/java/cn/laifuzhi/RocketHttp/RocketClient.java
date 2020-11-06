@@ -3,6 +3,7 @@ package cn.laifuzhi.RocketHttp;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -23,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /*
@@ -53,27 +55,19 @@ public final class RocketClient implements Closeable {
     public static final AttributeKey<Promise<String>> PROMISE = AttributeKey.valueOf("PROMISE");
 
     private final Bootstrap bootstrap;
-    private final RocketChannelPool rocketChannelPool;
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
     public RocketClient() {
         bootstrap = new Bootstrap().group(new NioEventLoopGroup())
                 .channel(NioSocketChannel.class)
-//                .option(ChannelOption.ALLOCATOR, ByteBufAllocator.DEFAULT)
-//                .option(ChannelOption.AUTO_CLOSE, false)
-//                .option(ChannelOption.SO_REUSEADDR, true)
-//                .option(ChannelOption.SO_KEEPALIVE, false)
-//                .option(ChannelOption.TCP_NODELAY, true)
-//                关了AUTO_READ需要自己手动读取响应
-//                .option(ChannelOption.AUTO_READ, false)
+                // 其他参数全部用netty默认
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000)
-//                .option(ChannelOption.SO_RCVBUF, 32 * 1024)
-//                .option(ChannelOption.SO_SNDBUF, 32 * 1024)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {
                         ch.pipeline()
-                                .addLast(new RocketIdleHandler(0, 0, 60))
+                                // 10s主动关闭channel
+                                .addLast(new RocketIdleHandler(0, 0, 10))
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(10 * 1024 * 1024))
                                 .addLast(new HttpContentDecompressor())
@@ -81,10 +75,9 @@ public final class RocketClient implements Closeable {
                                 .addLast(new RocketHandler());
                     }
                 });
-        rocketChannelPool = new RocketChannelPool(bootstrap, 100);
     }
 
-    public String execute(String host, int port, String uri) throws Exception {
+    public String execute(String host, int port, String uri) throws InterruptedException, ExecutionException {
         if (isClosed.get()) {
             throw new RuntimeException("RocketClient already close");
         }
@@ -93,16 +86,14 @@ public final class RocketClient implements Closeable {
         headers.set(HttpHeaderNames.HOST, host);
         headers.set(HttpHeaderNames.USER_AGENT, "RocketClient");
         headers.set(HttpHeaderNames.ACCEPT, "*/*");
-        Channel channel = rocketChannelPool.acquire(host, port);
-        try {
-            Promise<String> promise = channel.eventLoop().newPromise();
-            // 执行writeAndFlush时，如果channel已经关闭，则ChannelFutureListener中的channel pipeline已经没有自定义handler了
-            // 所以单纯用FIRE_EXCEPTION_ON_FAILURE没有办法处理promise，因为RocketHandler已经没了
-            channel.writeAndFlush(httpRequest).addListener(new RocketWriteListener(promise));
-            return promise.get();
-        } finally {
-            rocketChannelPool.release(host, port, channel);
-        }
+
+        ChannelFuture connectFuture = bootstrap.connect(host, port);
+        Channel channel = connectFuture.channel();
+        Promise<String> promise = channel.eventLoop().newPromise();
+        // 执行writeAndFlush时，如果channel已经关闭，则ChannelFutureListener中的channel pipeline已经没有自定义handler了
+        // 所以单纯用FIRE_EXCEPTION_ON_FAILURE没有办法处理promise，因为RocketHandler已经没了
+        channel.writeAndFlush(httpRequest).addListener(new RocketWriteListener(promise));
+        return promise.get();
     }
 
     @Override
@@ -110,7 +101,6 @@ public final class RocketClient implements Closeable {
         if (isClosed.compareAndSet(false, true)) {
             log.info("RocketClient closing...");
             bootstrap.config().group().shutdownGracefully().syncUninterruptibly();
-            rocketChannelPool.close();
         }
     }
 }

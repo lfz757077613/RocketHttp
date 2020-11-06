@@ -1,21 +1,15 @@
 package cn.laifuzhi.RocketHttp;
 
 
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 public class RocketClientTest {
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws ExecutionException, InterruptedException, IOException {
         RocketClient rocketClient = new RocketClient();
-        System.out.println(rocketClient.execute("www.baidu.com", 80, "").length());
-        System.out.println(rocketClient.execute("www.baidu.com", 80, "").length());
-//        TimeUnit.SECONDS.sleep(8);
-        System.out.println(rocketClient.execute("qq.com", 80, "").length());
-        System.out.println(rocketClient.execute("qq.com", 80, "").length());
-        TimeUnit.SECONDS.sleep(22);
-        System.out.println(rocketClient.execute("www.baidu.com", 80, "").length());
-        System.out.println(rocketClient.execute("qq.com", 80, "").length());
-
-//        rocketClient.close();
+        System.out.println(rocketClient.execute("www.baidu.com", 80, ""));
+        rocketClient.close();
         TimeUnit.SECONDS.sleep(1000);
     }
 }
