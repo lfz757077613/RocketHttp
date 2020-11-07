@@ -116,7 +116,7 @@ public final class RocketClient implements Closeable {
 
             @Override
             public boolean validateObject(String key, PooledObject<RocketChannel> p) {
-                log.debug("validateObject key:{} firstUsed:{}channel:{}", key, p.getObject().isFirstUsed(), getSocketName(p.getObject().getChannelFuture().channel()));
+                log.debug("validateObject key:{} firstUsed:{} channel:{}", key, p.getObject().isFirstUsed(), getSocketName(p.getObject().getChannelFuture().channel()));
                 return p.getObject().isFirstUsed() || p.getObject().getChannelFuture().channel().isActive();
             }
 
