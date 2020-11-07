@@ -3,6 +3,7 @@ package cn.laifuzhi.RocketHttp;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -20,10 +21,20 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.Promise;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.pool2.KeyedPooledObjectFactory;
+import org.apache.commons.pool2.PooledObject;
+import org.apache.commons.pool2.impl.DefaultPooledObject;
+import org.apache.commons.pool2.impl.GenericKeyedObjectPool;
+import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static cn.laifuzhi.RocketHttp.Utils.getSocketName;
+import static cn.laifuzhi.RocketHttp.Utils.joinHostPort;
+import static cn.laifuzhi.RocketHttp.Utils.splitHostPort;
 
 /*
                        _oo0oo_
@@ -53,7 +64,7 @@ public final class RocketClient implements Closeable {
     public static final AttributeKey<Promise<String>> PROMISE = AttributeKey.valueOf("PROMISE");
 
     private final Bootstrap bootstrap;
-    private final RocketChannelPool rocketChannelPool;
+    private final GenericKeyedObjectPool<String, Channel> channelPool;
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
     public RocketClient() {
@@ -81,7 +92,46 @@ public final class RocketClient implements Closeable {
                                 .addLast(new RocketHandler());
                     }
                 });
-        rocketChannelPool = new RocketChannelPool(bootstrap, 100);
+
+        GenericKeyedObjectPoolConfig<Channel> poolConfig = new GenericKeyedObjectPoolConfig<>();
+        poolConfig.setMaxTotalPerKey(100);
+        poolConfig.setBlockWhenExhausted(true);
+        poolConfig.setMaxWaitMillis(3000);
+        poolConfig.setTestOnBorrow(true);
+        poolConfig.setTestOnReturn(true);
+        poolConfig.setTimeBetweenEvictionRunsMillis(10000);
+        poolConfig.setMinEvictableIdleTimeMillis(10000);
+        channelPool = new GenericKeyedObjectPool<>(new KeyedPooledObjectFactory<String, Channel>() {
+            @Override
+            public PooledObject<Channel> makeObject(String key) throws Exception {
+                log.debug("makeObject key:{}", key);
+                List<String> hostPort = splitHostPort(key);
+                ChannelFuture channelFuture = bootstrap.connect(hostPort.get(0), Integer.parseInt(hostPort.get(1))).syncUninterruptibly();
+                return new DefaultPooledObject<>(channelFuture.channel());
+            }
+
+            @Override
+            public void destroyObject(String key, PooledObject<Channel> p) throws Exception {
+                log.debug("destroyObject key:{} channel:{}", key, getSocketName(p.getObject()));
+                p.getObject().close().syncUninterruptibly();
+            }
+
+            @Override
+            public boolean validateObject(String key, PooledObject<Channel> p) {
+                log.debug("validateObject key:{} channel:{}", key, getSocketName(p.getObject()));
+                return p.getObject().isActive();
+            }
+
+            @Override
+            public void activateObject(String key, PooledObject<Channel> p) throws Exception {
+                //忽略
+            }
+
+            @Override
+            public void passivateObject(String key, PooledObject<Channel> p) throws Exception {
+                //忽略
+            }
+        }, poolConfig);
     }
 
     public String execute(String host, int port, String uri) throws Exception {
@@ -93,7 +143,7 @@ public final class RocketClient implements Closeable {
         headers.set(HttpHeaderNames.HOST, host);
         headers.set(HttpHeaderNames.USER_AGENT, "RocketClient");
         headers.set(HttpHeaderNames.ACCEPT, "*/*");
-        Channel channel = rocketChannelPool.acquire(host, port);
+        Channel channel = channelPool.borrowObject(joinHostPort(host, port));
         try {
             Promise<String> promise = channel.eventLoop().newPromise();
             // 执行writeAndFlush时，如果channel已经关闭，则ChannelFutureListener中的channel pipeline已经没有自定义handler了
@@ -101,7 +151,7 @@ public final class RocketClient implements Closeable {
             channel.writeAndFlush(httpRequest).addListener(new RocketWriteListener(promise));
             return promise.get();
         } finally {
-            rocketChannelPool.release(host, port, channel);
+            channelPool.returnObject(joinHostPort(host, port), channel);
         }
     }
 
@@ -110,7 +160,7 @@ public final class RocketClient implements Closeable {
         if (isClosed.compareAndSet(false, true)) {
             log.info("RocketClient closing...");
             bootstrap.config().group().shutdownGracefully().syncUninterruptibly();
-            rocketChannelPool.close();
+            channelPool.close();
         }
     }
 }
