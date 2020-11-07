@@ -5,6 +5,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.DefaultEventLoop;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -18,6 +19,7 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.AttributeKey;
+import io.netty.util.concurrent.GlobalEventExecutor;
 import io.netty.util.concurrent.Promise;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.pool2.KeyedPooledObjectFactory;
@@ -142,7 +144,9 @@ public final class RocketClient implements Closeable {
         headers.set(HttpHeaderNames.USER_AGENT, "RocketClient");
         headers.set(HttpHeaderNames.ACCEPT, "*/*");
         RocketChannel rocketChannel = channelPool.borrowObject(joinHostPort(host, port));
-        Promise<String> promise = rocketChannel.getChannelFuture().channel().eventLoop().newPromise();
+        // 避免将归还连接池的操作交给netty的eventLoop执行，归还操作有锁，会阻塞netty的eventLoop
+//        Promise<String> promise = rocketChannel.getChannelFuture().channel().eventLoop().newPromise();
+        Promise<String> promise = GlobalEventExecutor.INSTANCE.newPromise();
         promise.addListener(future -> channelPool.returnObject(joinHostPort(host, port), rocketChannel));
         if (rocketChannel.isFirstUsed()) {
             rocketChannel.setFirstUsed(false);
