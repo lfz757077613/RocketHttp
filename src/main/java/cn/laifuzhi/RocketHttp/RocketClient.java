@@ -66,6 +66,7 @@ public final class RocketClient implements Closeable {
     private final Bootstrap bootstrap;
     private final GenericKeyedObjectPool<String, RocketChannel> channelPool;
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
+    private final RocketHandler rocketHandler = new RocketHandler();
 
     public RocketClient() {
         bootstrap = new Bootstrap().group(new NioEventLoopGroup())
@@ -89,7 +90,7 @@ public final class RocketClient implements Closeable {
                                 .addLast(new HttpObjectAggregator(10 * 1024 * 1024))
                                 .addLast(new HttpContentDecompressor())
                                 .addLast(new ChunkedWriteHandler())
-                                .addLast(new RocketHandler());
+                                .addLast(rocketHandler);
                     }
                 });
 

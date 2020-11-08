@@ -1,5 +1,6 @@
 package cn.laifuzhi.RocketHttp;
 
+import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.group.ChannelGroup;
@@ -16,6 +17,7 @@ import java.io.IOException;
 import static cn.laifuzhi.RocketHttp.RocketClient.PROMISE;
 
 @Slf4j
+@Sharable
 @AllArgsConstructor
 public final class RocketHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
     // 收集所有活着的channel，以后备用
