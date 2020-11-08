@@ -1,1 +1,9 @@
 # RocketClient
+- 基于netty实现了基础的httpClient，基于common-pool池化连接，分别实现http的同步和异步调用
+- 本工程的重点在于连接的管理和异步响应式编程，http协议部分只支持最基本的get请求，只会返回http响应体的字符串内容
+- 代码简洁清晰，方便二次开发
+### 分支说明
+- sync：最基础的同步http调用，每次请求都新建连接，阻塞等待连接完成后发出http请求，阻塞等待http响应
+- async：最基础的异步http调用，每次请求都新建连接，连接完成后回调发出http请求，不阻塞等待http响应，直接返回包含响应的promise，http响应后回调写入promise
+- syncPool：使用连接池同步http调用，每次从池中获取连接。如果没有可用连接则新建连接，阻塞等待连接完成后发出http请求，阻塞等待http响应
+- asyncPool：使用连接池异步http调用，每次从池中获取连接。如果没有可用连接则新建连接，连接完成后回调发出http请求，不阻塞等待http响应，直接返回包含响应的promise，http响应后回调写入promise

@@ -99,8 +99,9 @@ public final class RocketClient implements Closeable {
         poolConfig.setBlockWhenExhausted(false);
         poolConfig.setTestOnBorrow(true);
         poolConfig.setTestOnReturn(true);
-        poolConfig.setTimeBetweenEvictionRunsMillis(60000);
-        poolConfig.setMinEvictableIdleTimeMillis(60000);
+        // 每60s清理一次空闲时间超过60秒的连接，调用destroyObject
+        poolConfig.setTimeBetweenEvictionRunsMillis(10000);
+        poolConfig.setMinEvictableIdleTimeMillis(10000);
         channelPool = new GenericKeyedObjectPool<>(new KeyedPooledObjectFactory<String, RocketChannel>() {
             @Override
             public PooledObject<RocketChannel> makeObject(String key) throws Exception {
@@ -117,6 +118,8 @@ public final class RocketClient implements Closeable {
 
             @Override
             public boolean validateObject(String key, PooledObject<RocketChannel> p) {
+                // 当设置了testOnBorrow为true的话，会对makeObject新建的对象调用validateObject，如果false则会抛出异常
+                // 所以当isFirstUsed时(刚刚创建的连接)，validateObject直接返回true
                 log.debug("validateObject key:{} firstUsed:{} channel:{}", key, p.getObject().isFirstUsed(), getSocketName(p.getObject().getChannelFuture().channel()));
                 return p.getObject().isFirstUsed() || p.getObject().getChannelFuture().channel().isActive();
             }
@@ -143,7 +146,7 @@ public final class RocketClient implements Closeable {
         headers.set(HttpHeaderNames.USER_AGENT, "RocketClient");
         headers.set(HttpHeaderNames.ACCEPT, "*/*");
         RocketChannel rocketChannel = channelPool.borrowObject(joinHostPort(host, port));
-        // 避免将归还连接池的操作交给netty的eventLoop执行，归还操作有锁，会阻塞netty的eventLoop
+        // 使用GlobalEventExecutor，避免将归还连接池的操作交给netty的eventLoop执行，归还操作有锁，会阻塞netty的eventLoop
 //        Promise<String> promise = rocketChannel.getChannelFuture().channel().eventLoop().newPromise();
         Promise<String> promise = GlobalEventExecutor.INSTANCE.newPromise();
         promise.addListener(future -> channelPool.returnObject(joinHostPort(host, port), rocketChannel));
