@@ -101,8 +101,8 @@ public final class RocketClient implements Closeable {
         poolConfig.setTestOnBorrow(true);
         poolConfig.setTestOnReturn(true);
         // 每60s清理一次空闲时间超过60秒的连接，调用destroyObject
-        poolConfig.setTimeBetweenEvictionRunsMillis(10000);
-        poolConfig.setMinEvictableIdleTimeMillis(10000);
+        poolConfig.setTimeBetweenEvictionRunsMillis(60000);
+        poolConfig.setMinEvictableIdleTimeMillis(60000);
         channelPool = new GenericKeyedObjectPool<>(new KeyedPooledObjectFactory<String, RocketChannel>() {
             @Override
             public PooledObject<RocketChannel> makeObject(String key) throws Exception {
