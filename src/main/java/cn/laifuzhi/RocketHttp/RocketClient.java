@@ -2,9 +2,17 @@ package cn.laifuzhi.RocketHttp;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.Epoll;
+import io.netty.channel.epoll.EpollEventLoopGroup;
+import io.netty.channel.epoll.EpollSocketChannel;
+import io.netty.channel.kqueue.KQueue;
+import io.netty.channel.kqueue.KQueueEventLoopGroup;
+import io.netty.channel.kqueue.KQueueSocketChannel;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -21,8 +29,10 @@ import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import io.netty.util.concurrent.Promise;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.pool2.BaseKeyedPooledObjectFactory;
 import org.apache.commons.pool2.KeyedPooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
+import org.apache.commons.pool2.PooledObjectState;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPool;
 import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
@@ -30,11 +40,13 @@ import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static cn.laifuzhi.RocketHttp.Utils.getSocketName;
 import static cn.laifuzhi.RocketHttp.Utils.joinHostPort;
 import static cn.laifuzhi.RocketHttp.Utils.splitHostPort;
+import static org.apache.commons.pool2.PoolUtils.synchronizedKeyedPooledFactory;
 
 /*
                        _oo0oo_
@@ -69,8 +81,19 @@ public final class RocketClient implements Closeable {
     private final RocketHandler rocketHandler = new RocketHandler();
 
     public RocketClient() {
-        bootstrap = new Bootstrap().group(new NioEventLoopGroup())
-                .channel(NioSocketChannel.class)
+        // 增加Native transports能力
+        EventLoopGroup eventLoopGroup = null;
+        Class<? extends Channel> channelClass = null;
+        if (Epoll.isAvailable()) {
+            eventLoopGroup = new EpollEventLoopGroup();
+            channelClass = EpollSocketChannel.class;
+        }
+        if (KQueue.isAvailable()) {
+            eventLoopGroup = new KQueueEventLoopGroup();
+            channelClass = KQueueSocketChannel.class;
+        }
+        bootstrap = new Bootstrap().group(eventLoopGroup != null ? eventLoopGroup : new NioEventLoopGroup())
+                .channel(channelClass != null ? channelClass : NioSocketChannel.class)
 //                .option(ChannelOption.ALLOCATOR, ByteBufAllocator.DEFAULT)
 //                .option(ChannelOption.AUTO_CLOSE, false)
 //                .option(ChannelOption.SO_REUSEADDR, true)
@@ -103,18 +126,26 @@ public final class RocketClient implements Closeable {
         // 每60s清理一次空闲时间超过60秒的连接，调用destroyObject
         poolConfig.setTimeBetweenEvictionRunsMillis(60000);
         poolConfig.setMinEvictableIdleTimeMillis(60000);
-        channelPool = new GenericKeyedObjectPool<>(new KeyedPooledObjectFactory<String, RocketChannel>() {
+        channelPool = new GenericKeyedObjectPool<>(new BaseKeyedPooledObjectFactory<String, RocketChannel>() {
             @Override
-            public PooledObject<RocketChannel> makeObject(String key) throws Exception {
-                log.debug("makeObject key:{}", key);
+            public RocketChannel create(String key) throws Exception {
+                log.debug("create key:{}", key);
                 List<String> hostPort = splitHostPort(key);
-                return new DefaultPooledObject<>(new RocketChannel(true, bootstrap.connect(hostPort.get(0), Integer.parseInt(hostPort.get(1)))));
+                return new RocketChannel(true, false, bootstrap.connect(hostPort.get(0), Integer.parseInt(hostPort.get(1))));
+            }
+
+            @Override
+            public PooledObject<RocketChannel> wrap(RocketChannel value) {
+                return new DefaultPooledObject<>(value);
             }
 
             @Override
             public void destroyObject(String key, PooledObject<RocketChannel> p) throws Exception {
                 log.debug("destroyObject key:{} channel:{}", key, getSocketName(p.getObject().getChannelFuture().channel()));
-                p.getObject().getChannelFuture().channel().close().syncUninterruptibly();
+                // 纯异步则不能阻塞，close也就不能调用syncUninterruptibly
+                // 所以执行完destroyObject后，可能channel的isActive仍为true
+                p.getObject().setDestroyed(true);
+                p.getObject().getChannelFuture().channel().close();
             }
 
             @Override
@@ -122,17 +153,10 @@ public final class RocketClient implements Closeable {
                 // 当设置了testOnBorrow为true的话，会对makeObject新建的对象调用validateObject，如果false则会抛出异常
                 // 所以当isFirstUsed时(刚刚创建的连接)，validateObject直接返回true
                 log.debug("validateObject key:{} firstUsed:{} channel:{}", key, p.getObject().isFirstUsed(), getSocketName(p.getObject().getChannelFuture().channel()));
+                if (p.getObject().isDestroyed()) {
+                    return false;
+                }
                 return p.getObject().isFirstUsed() || p.getObject().getChannelFuture().channel().isActive();
-            }
-
-            @Override
-            public void activateObject(String key, PooledObject<RocketChannel> p) throws Exception {
-                //忽略
-            }
-
-            @Override
-            public void passivateObject(String key, PooledObject<RocketChannel> p) throws Exception {
-                //忽略
             }
         }, poolConfig);
     }
