@@ -105,7 +105,7 @@ public final class RocketClient implements Closeable {
                     @Override
                     protected void initChannel(SocketChannel ch) {
                         ch.pipeline()
-                                .addLast(new RocketIdleHandler(0, 0, 60))
+                                .addLast(new RocketIdleHandler(0, 0, 90))
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(10 * 1024 * 1024))
                                 .addLast(new HttpContentDecompressor())
@@ -122,8 +122,8 @@ public final class RocketClient implements Closeable {
         poolConfig.setTestOnBorrow(true);
         poolConfig.setTestOnReturn(true);
         // 每60s清理一次空闲时间超过60秒的连接，调用destroyObject
-        poolConfig.setTimeBetweenEvictionRunsMillis(60000);
-        poolConfig.setMinEvictableIdleTimeMillis(60000);
+        poolConfig.setTimeBetweenEvictionRunsMillis(3000);
+        poolConfig.setMinEvictableIdleTimeMillis(3000);
         channelPool = new GenericKeyedObjectPool<>(new BaseKeyedPooledObjectFactory<String, RocketChannelWrapper>() {
             @Override
             public RocketChannelWrapper create(String key) throws Exception {
