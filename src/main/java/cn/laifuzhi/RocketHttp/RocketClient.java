@@ -116,6 +116,7 @@ public final class RocketClient implements Closeable {
 
         GenericKeyedObjectPoolConfig<RocketChannelWrapper> poolConfig = new GenericKeyedObjectPoolConfig<>();
         poolConfig.setMaxTotalPerKey(100);
+        poolConfig.setMaxIdlePerKey(100);
         // 纯异步则不能阻塞了
         poolConfig.setBlockWhenExhausted(false);
         poolConfig.setTestOnBorrow(true);
@@ -171,7 +172,7 @@ public final class RocketClient implements Closeable {
         RocketChannelWrapper channelWrapper = channelPool.borrowObject(joinHostPort(host, port));
         // 连接归还不占用当前channel的eventLoop线程
 //         Promise<String> promise = channelWrapper.getChannelFuture().channel().eventLoop().newPromise();
-         Promise<String> promise = GlobalEventExecutor.INSTANCE.newPromise();
+        Promise<String> promise = GlobalEventExecutor.INSTANCE.newPromise();
         promise.addListener(future -> channelPool.returnObject(joinHostPort(host, port), channelWrapper));
         channelWrapper.getChannelFuture().channel().attr(PROMISE).set(promise);
         if (channelWrapper.isFirstUsed()) {
