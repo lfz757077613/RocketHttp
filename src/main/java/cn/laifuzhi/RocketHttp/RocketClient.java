@@ -146,9 +146,10 @@ public final class RocketClient implements Closeable {
         Channel channel = channelPool.borrowObject(joinHostPort(host, port));
         try {
             Promise<String> promise = channel.eventLoop().newPromise();
+            channel.attr(PROMISE).set(promise);
             // 执行writeAndFlush时，如果channel已经关闭，则ChannelFutureListener中的channel pipeline已经没有自定义handler了
             // 所以单纯用FIRE_EXCEPTION_ON_FAILURE没有办法处理promise，因为RocketHandler已经没了
-            channel.writeAndFlush(httpRequest).addListener(new RocketWriteListener(promise));
+            channel.writeAndFlush(httpRequest).addListener(new RocketWriteListener());
             return promise.get();
         } finally {
             channelPool.returnObject(joinHostPort(host, port), channel);
