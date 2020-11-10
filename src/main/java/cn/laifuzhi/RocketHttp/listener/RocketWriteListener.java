@@ -1,4 +1,4 @@
-package cn.laifuzhi.RocketHttp;
+package cn.laifuzhi.RocketHttp.listener;
 
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -17,10 +17,7 @@ public final class RocketWriteListener implements ChannelFutureListener {
     public void operationComplete(ChannelFuture future) throws Exception {
         if (!future.isSuccess()) {
             Promise<String> promise = future.channel().attr(PROMISE).get();
-            promise.setFailure(future.cause());
-            if (future.channel().isActive()) {
-                future.channel().pipeline().fireExceptionCaught(future.cause());
-            }
+            promise.tryFailure(future.cause());
             // isActive为false说明写入发生错误时，连接已经关闭
         }
     }

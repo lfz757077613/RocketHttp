@@ -1,4 +1,4 @@
-package cn.laifuzhi.RocketHttp;
+package cn.laifuzhi.RocketHttp.handler;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.timeout.IdleStateEvent;
@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import static cn.laifuzhi.RocketHttp.Utils.getSocketName;
 
 @Slf4j
-// 既可以回收空闲连接，又可以解决假死连接造成的各种问题。最终都会触发channel的close
 public final class RocketIdleHandler extends IdleStateHandler {
     public RocketIdleHandler(int readerIdleTimeSeconds, int writerIdleTimeSeconds, int allIdleTimeSeconds) {
         super(readerIdleTimeSeconds, writerIdleTimeSeconds, allIdleTimeSeconds);

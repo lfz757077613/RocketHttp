@@ -1,4 +1,4 @@
-package cn.laifuzhi.RocketHttp;
+package cn.laifuzhi.RocketHttp.handler;
 
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
@@ -6,7 +6,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.Promise;
-import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -19,26 +18,26 @@ import static cn.laifuzhi.RocketHttp.Utils.getSocketName;
  */
 @Slf4j
 @Sharable
-@AllArgsConstructor
 public final class RocketHandler extends SimpleChannelInboundHandler<FullHttpResponse> {
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpResponse msg) throws Exception {
         Promise<String> promise = ctx.channel().attr(PROMISE).get();
-        if (promise == null || promise.isDone()) {
+        if (promise == null) {
             // 永远不会有这种情况才对，否则是netty本身有bug
-            log.error("promise already done channel:{}", getSocketName(ctx.channel()));
+            log.error("promise null channel:{}", getSocketName(ctx.channel()));
             ctx.close();
             return;
         }
-        promise.setSuccess(msg.content().toString(CharsetUtil.UTF_8));
+        // 此时可能已经超时，被设置了timeoutException
+        promise.trySuccess(msg.content().toString(CharsetUtil.UTF_8));
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         log.debug("channelInactive channel:{}", getSocketName(ctx.channel()));
         Promise<String> promise = ctx.channel().attr(PROMISE).get();
-        if (promise != null && !promise.isDone()) {
-            promise.setFailure(new IOException("channel close"));
+        if (promise != null) {
+            promise.tryFailure(new IOException("channel close"));
         }
         super.channelInactive(ctx);
     }
@@ -47,8 +46,8 @@ public final class RocketHandler extends SimpleChannelInboundHandler<FullHttpRes
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         log.error("exceptionCaught channel:{}", getSocketName(ctx.channel()));
         Promise<String> promise = ctx.channel().attr(PROMISE).get();
-        if (promise != null && !promise.isDone()) {
-            promise.setFailure(cause);
+        if (promise != null) {
+            promise.tryFailure(cause);
         }
         ctx.close();
     }
