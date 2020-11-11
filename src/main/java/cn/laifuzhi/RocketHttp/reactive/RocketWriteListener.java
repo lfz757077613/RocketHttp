@@ -1,11 +1,12 @@
-package cn.laifuzhi.RocketHttp.listener;
+package cn.laifuzhi.RocketHttp.reactive;
 
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
-import io.netty.util.concurrent.Promise;
 import lombok.extern.slf4j.Slf4j;
 
-import static cn.laifuzhi.RocketHttp.RocketClient.PROMISE;
+import java.util.concurrent.CompletableFuture;
+
+import static cn.laifuzhi.RocketHttp.RocketClient.FUTURE;
 
 /**
  * writeAndFlush发出http请求的listener，负责对channel绑定promise，并且处理请求异常
@@ -16,8 +17,8 @@ public final class RocketWriteListener implements ChannelFutureListener {
     @Override
     public void operationComplete(ChannelFuture future) throws Exception {
         if (!future.isSuccess()) {
-            Promise<String> promise = future.channel().attr(PROMISE).get();
-            promise.tryFailure(future.cause());
+            CompletableFuture<String> result = future.channel().attr(FUTURE).get();
+            result.completeExceptionally(future.cause());
             // isActive为false说明写入发生错误时，连接已经关闭
         }
     }

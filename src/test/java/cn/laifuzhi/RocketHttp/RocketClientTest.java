@@ -1,13 +1,11 @@
 package cn.laifuzhi.RocketHttp;
 
 
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
-import io.netty.util.concurrent.Promise;
+import cn.laifuzhi.RocketHttp.reactive.RocketDIYHandler;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.RejectedExecutionHandler;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -22,26 +20,30 @@ public class RocketClientTest {
             TimeUnit.MILLISECONDS.sleep(10);
             threadPoolExecutor.execute(() -> {
                 try {
-                    Promise<String> promise1 = rocketClient.execute("www.qq.com", 80, "");
-                    promise1.addListener((GenericFutureListener<Future<String>>) future -> {
-                        if (future.isSuccess()) {
-                            if (future.get().length() > 280000) {
-                                System.out.println("qq" + future.get());
-                            }
-                            System.out.println(count.incrementAndGet());
-                        } else {
-                            log.error("baidu", future.cause());
-                        }
-                    });
-                    Promise<String> promise2 = rocketClient.execute("www.baidu.com", 80, "");
-                    promise2.addListener((GenericFutureListener<Future<String>>) future -> {
-                        if (future.isSuccess()) {
-                            if (future.get().length() < 280000) {
-                                System.out.println("baidu" + future.get());
+                    CompletableFuture<String> future1 = rocketClient.execute("www.qq.com", 80, "", new RocketDIYHandler() {
+                        @Override
+                        public void onCompleted(String response) throws Exception {
+                            if (response.length() > 280000) {
+                                System.out.println("qq" + response);
                             }
                             System.out.println(count.incrementAndGet());
                         }
+
+                        @Override
+                        public void onThrowable(Throwable t) {
+                            log.error("qq", t);
+                        }
                     });
+//                    CompletableFuture<String> future2 = rocketClient.execute("www.baidu.com", 80, "");
+//                    future2.whenComplete((response, throwable) -> {
+//                        if (response != null && response.length() < 280000) {
+//                            System.out.println("baidu" + response.length());
+//                        }
+//                        System.out.println(count.incrementAndGet());
+//                        if (throwable != null) {
+//                            log.error("baidu", throwable);
+//                        }
+//                    });
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

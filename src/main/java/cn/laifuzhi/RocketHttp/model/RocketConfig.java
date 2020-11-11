@@ -1,4 +1,4 @@
 package cn.laifuzhi.RocketHttp.model;
 
-public class RocketConfig {
+public final class RocketConfig {
 }

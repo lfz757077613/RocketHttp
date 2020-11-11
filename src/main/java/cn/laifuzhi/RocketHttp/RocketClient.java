@@ -1,8 +1,10 @@
 package cn.laifuzhi.RocketHttp;
 
-import cn.laifuzhi.RocketHttp.handler.RocketHandler;
-import cn.laifuzhi.RocketHttp.listener.RocketConnectListener;
-import cn.laifuzhi.RocketHttp.listener.RocketRespListener;
+import cn.laifuzhi.RocketHttp.reactive.RocketDIYHandler;
+import cn.laifuzhi.RocketHttp.reactive.RocketNettyHandler;
+import cn.laifuzhi.RocketHttp.reactive.RocketChannelConsumer;
+import cn.laifuzhi.RocketHttp.reactive.RocketDIYConsumer;
+import cn.laifuzhi.RocketHttp.reactive.RocketConnectListener;
 import cn.laifuzhi.RocketHttp.model.RocketChannelWrapper;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
@@ -10,7 +12,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.DefaultEventLoopGroup;
-import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
@@ -31,7 +32,6 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.AttributeKey;
-import io.netty.util.concurrent.Promise;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.pool2.BaseKeyedPooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
@@ -42,6 +42,7 @@ import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -75,12 +76,12 @@ import static cn.laifuzhi.RocketHttp.Utils.splitHostPort;
 */
 @Slf4j
 public final class RocketClient implements Closeable {
-    public static final AttributeKey<Promise<String>> PROMISE = AttributeKey.valueOf("PROMISE");
+    public static final AttributeKey<CompletableFuture<String>> FUTURE = AttributeKey.valueOf("FUTURE");
 
     private final Bootstrap bootstrap;
     private final GenericKeyedObjectPool<String, RocketChannelWrapper> channelPool;
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
-    private final RocketHandler rocketHandler = new RocketHandler();
+    private final RocketNettyHandler rocketNettyHandler = new RocketNettyHandler();
     private final DefaultEventLoopGroup eventLoopGroup = new DefaultEventLoopGroup();
 
     public RocketClient() {
@@ -112,13 +113,11 @@ public final class RocketClient implements Closeable {
                     @Override
                     protected void initChannel(SocketChannel ch) {
                         ch.pipeline()
-                                // 加入了默认的请求超时机制，请求错误则invalidateObject关闭连接，所以不需要IdleHandler了
-//                                .addLast(new RocketIdleHandler(0, 0, 90))
                                 .addLast(new HttpClientCodec())
                                 .addLast(new HttpObjectAggregator(10 * 1024 * 1024))
                                 .addLast(new HttpContentDecompressor())
                                 .addLast(new ChunkedWriteHandler())
-                                .addLast(rocketHandler);
+                                .addLast(rocketNettyHandler);
                     }
                 });
 
@@ -170,13 +169,15 @@ public final class RocketClient implements Closeable {
         Runtime.getRuntime().addShutdownHook(new Thread(this::close));
     }
 
-    public Promise<String> execute(String host, int port, String uri) {
-        EventLoop eventLoop = eventLoopGroup.next();
-        Promise<String> promise = eventLoop.newPromise();
+    public CompletableFuture<String> execute(String host, int port, String uri, RocketDIYHandler diyHandler) {
+        CompletableFuture<String> result = new CompletableFuture<>();
+        if (diyHandler != null) {
+            result.whenComplete(new RocketDIYConsumer(diyHandler));
+        }
         try {
             if (isClosed.get()) {
-                promise.tryFailure(new IOException("RocketClient closed"));
-                return promise;
+                result.completeExceptionally(new IOException("RocketClient closed"));
+                return result;
             }
             DefaultFullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, uri, Unpooled.EMPTY_BUFFER);
             HttpHeaders headers = httpRequest.headers();
@@ -185,19 +186,23 @@ public final class RocketClient implements Closeable {
             headers.set(HttpHeaderNames.ACCEPT, "*/*");
             String channelKey = joinHostPort(host, port);
             RocketChannelWrapper channelWrapper = channelPool.borrowObject(channelKey);
+            result.whenComplete(new RocketChannelConsumer(channelPool, channelWrapper, channelKey));
             if (channelWrapper.isFirstUsed()) {
                 channelWrapper.setFirstUsed(false);
             }
             Channel channel = channelWrapper.getConnectFuture().channel();
             // 设置请求的整体超时时间，如果是新建的连接，则包含连接时间
-            eventLoop.schedule(() -> promise.tryFailure(new TimeoutException("request timeout")), 60000, TimeUnit.MILLISECONDS);
-            promise.addListener(new RocketRespListener(channelPool, channelWrapper, channelKey));
-            channel.attr(PROMISE).set(promise);
+            eventLoopGroup.schedule(() -> result.completeExceptionally(new TimeoutException("request timeout")), 60000, TimeUnit.MILLISECONDS);
+            channel.attr(FUTURE).set(result);
             channelWrapper.getConnectFuture().addListener(new RocketConnectListener(httpRequest));
         } catch (Exception e) {
-            promise.tryFailure(e);
+            result.completeExceptionally(e);
         }
-        return promise;
+        return result;
+    }
+
+    public CompletableFuture<String> execute(String host, int port, String uri) {
+        return execute(host, port, uri, null);
     }
 
     @Override
