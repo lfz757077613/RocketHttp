@@ -32,7 +32,7 @@ RocketResponse rocketResponse = rocketClient.execute(RocketRequest.get("www.baid
 // 实际上execute方法返回的是CompletableFuture<RocketResponse>，如果不传入RocketDIYHandler可以自己处理future
 CompletableFuture<RocketResponse> future = rocketClient.execute(RocketRequest.get("www.qq.com", 80, ""))
 ```
-### 性能测试，[HttpAsyncClient](https://hc.apache.org/httpcomponents-asyncclient-dev/index.html)，[AsyncHttpClient](https://github.com/AsyncHttpClient/async-http-client)
+### 性能测试，分别同[HttpAsyncClient](https://hc.apache.org/httpcomponents-asyncclient-dev/index.html)和[AsyncHttpClient](https://github.com/AsyncHttpClient/async-http-client)测试
 > 分别使用100个连接对同一个地址请求2000次，对比整体耗时，如果觉得测试方法不科学，跪求请一定要告诉我
 ###### 同HttpAsyncClient对比
 > 测试用例分别如下，HttpAsyncClient在获取不到连接时会阻塞等待，所以RocketClient也需要设置成获取不到连接时阻塞等待
