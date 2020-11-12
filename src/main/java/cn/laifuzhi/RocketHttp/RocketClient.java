@@ -1,12 +1,16 @@
 package cn.laifuzhi.RocketHttp;
 
+import cn.laifuzhi.RocketHttp.model.RocketChannelWrapper;
+import cn.laifuzhi.RocketHttp.model.RocketConfig;
+import cn.laifuzhi.RocketHttp.model.RocketRequest;
+import cn.laifuzhi.RocketHttp.model.RocketResponse;
+import cn.laifuzhi.RocketHttp.reactive.RocketChannelConsumer;
+import cn.laifuzhi.RocketHttp.reactive.RocketConnectListener;
+import cn.laifuzhi.RocketHttp.reactive.RocketDIYConsumer;
 import cn.laifuzhi.RocketHttp.reactive.RocketDIYHandler;
 import cn.laifuzhi.RocketHttp.reactive.RocketNettyHandler;
-import cn.laifuzhi.RocketHttp.reactive.RocketChannelConsumer;
-import cn.laifuzhi.RocketHttp.reactive.RocketDIYConsumer;
-import cn.laifuzhi.RocketHttp.reactive.RocketConnectListener;
-import cn.laifuzhi.RocketHttp.model.RocketChannelWrapper;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -27,9 +31,7 @@ import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
@@ -76,15 +78,17 @@ import static cn.laifuzhi.RocketHttp.Utils.splitHostPort;
 */
 @Slf4j
 public final class RocketClient implements Closeable {
-    public static final AttributeKey<CompletableFuture<String>> FUTURE = AttributeKey.valueOf("FUTURE");
-
+    public static final AttributeKey<CompletableFuture<RocketResponse>> FUTURE = AttributeKey.valueOf("FUTURE");
+    private RocketConfig config;
     private final Bootstrap bootstrap;
     private final GenericKeyedObjectPool<String, RocketChannelWrapper> channelPool;
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
     private final RocketNettyHandler rocketNettyHandler = new RocketNettyHandler();
+    // 负责处理请求超时和http请求的异步回调(包含调用用户自定义回调handler、归还或销毁channel)，不占用netty线程
     private final DefaultEventLoopGroup eventLoopGroup = new DefaultEventLoopGroup();
 
-    public RocketClient() {
+    public RocketClient(RocketConfig config) {
+        this.config = config;
         // 增加Native transports能力，因为会按顺序在多个目录加载本地库，目录中没有本地库文件就会打印些debug级别的异常，最终找到本地库会打印Successfully loaded the library
         // 类似这种可以忽略netty_transport_native_kqueue_x86_64 cannot be loaded
         EventLoopGroup eventLoopGroup = null;
@@ -106,7 +110,7 @@ public final class RocketClient implements Closeable {
 //                .option(ChannelOption.TCP_NODELAY, true)
 //                关了AUTO_READ需要自己手动读取响应
 //                .option(ChannelOption.AUTO_READ, false)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 3000)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, config.getConnectTimeout())
 //                .option(ChannelOption.SO_RCVBUF, 32 * 1024)
 //                .option(ChannelOption.SO_SNDBUF, 32 * 1024)
                 .handler(new ChannelInitializer<SocketChannel>() {
@@ -114,7 +118,7 @@ public final class RocketClient implements Closeable {
                     protected void initChannel(SocketChannel ch) {
                         ch.pipeline()
                                 .addLast(new HttpClientCodec())
-                                .addLast(new HttpObjectAggregator(10 * 1024 * 1024))
+                                .addLast(new HttpObjectAggregator(config.getHttpMaxContent()))
                                 .addLast(new HttpContentDecompressor())
                                 .addLast(new ChunkedWriteHandler())
                                 .addLast(rocketNettyHandler);
@@ -122,14 +126,14 @@ public final class RocketClient implements Closeable {
                 });
 
         GenericKeyedObjectPoolConfig<RocketChannelWrapper> poolConfig = new GenericKeyedObjectPoolConfig<>();
-        poolConfig.setMaxTotalPerKey(200);
-        poolConfig.setMaxIdlePerKey(200);
+        poolConfig.setMaxTotalPerKey(config.getMaxConnectPerHost());
+        poolConfig.setMaxIdlePerKey(config.getMaxConnectPerHost());
         // 纯异步则不能阻塞了
         poolConfig.setBlockWhenExhausted(false);
         poolConfig.setTestOnBorrow(true);
-        // 每60s清理一次空闲时间超过60秒的连接，调用destroyObject
-        poolConfig.setTimeBetweenEvictionRunsMillis(60000);
-        poolConfig.setMinEvictableIdleTimeMillis(60000);
+        // 每EvictIdleConnectPeriod秒清理一次空闲时间超过IdleConnectKeepAliveTime秒的连接，调用destroyObject
+        poolConfig.setTimeBetweenEvictionRunsMillis(config.getEvictIdleConnectPeriod());
+        poolConfig.setMinEvictableIdleTimeMillis(config.getIdleConnectKeepAliveTime());
         // -1代表每次检查全部空闲连接是否超过MinEvictableIdleTimeMillis，超过则evict
         poolConfig.setNumTestsPerEvictionRun(-1);
         channelPool = new GenericKeyedObjectPool<>(new BaseKeyedPooledObjectFactory<String, RocketChannelWrapper>() {
@@ -169,40 +173,59 @@ public final class RocketClient implements Closeable {
         Runtime.getRuntime().addShutdownHook(new Thread(this::close));
     }
 
-    public CompletableFuture<String> execute(String host, int port, String uri, RocketDIYHandler diyHandler) {
-        CompletableFuture<String> result = new CompletableFuture<>();
+    public CompletableFuture<RocketResponse> execute(RocketRequest request, RocketDIYHandler diyHandler) {
+        CompletableFuture<RocketResponse> result = new CompletableFuture<>();
         if (diyHandler != null) {
-            result.whenComplete(new RocketDIYConsumer(diyHandler));
+            result.whenCompleteAsync(new RocketDIYConsumer(diyHandler), eventLoopGroup);
         }
         try {
             if (isClosed.get()) {
                 result.completeExceptionally(new IOException("RocketClient closed"));
                 return result;
             }
-            DefaultFullHttpRequest httpRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, uri, Unpooled.EMPTY_BUFFER);
-            HttpHeaders headers = httpRequest.headers();
-            headers.set(HttpHeaderNames.HOST, host);
-            headers.set(HttpHeaderNames.USER_AGENT, "RocketClient");
-            headers.set(HttpHeaderNames.ACCEPT, "*/*");
-            String channelKey = joinHostPort(host, port);
+            DefaultFullHttpRequest nettyHttpRequest = RocketRequest2NettyHttpRequest(request);
+            String channelKey = joinHostPort(request.getHost(), request.getPort());
             RocketChannelWrapper channelWrapper = channelPool.borrowObject(channelKey);
-            result.whenComplete(new RocketChannelConsumer(channelPool, channelWrapper, channelKey));
+            result.whenCompleteAsync(new RocketChannelConsumer(channelPool, channelWrapper, channelKey), eventLoopGroup);
             if (channelWrapper.isFirstUsed()) {
                 channelWrapper.setFirstUsed(false);
             }
             Channel channel = channelWrapper.getConnectFuture().channel();
-            // 设置请求的整体超时时间，如果是新建的连接，则包含连接时间
-            eventLoopGroup.schedule(() -> result.completeExceptionally(new TimeoutException("request timeout")), 60000, TimeUnit.MILLISECONDS);
             channel.attr(FUTURE).set(result);
-            channelWrapper.getConnectFuture().addListener(new RocketConnectListener(httpRequest));
+            channelWrapper.getConnectFuture().addListener(new RocketConnectListener(nettyHttpRequest));
+            // 设置请求的整体超时时间，如果是新建的连接，则包含连接时间
+            int requestTimeout = request.getTimeout() > 0 ? request.getTimeout() : config.getRequestTimeout();
+            eventLoopGroup.schedule(() -> result.completeExceptionally(new TimeoutException("total timeout")), requestTimeout, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             result.completeExceptionally(e);
         }
         return result;
     }
 
-    public CompletableFuture<String> execute(String host, int port, String uri) {
-        return execute(host, port, uri, null);
+    public CompletableFuture<RocketResponse> execute(RocketRequest request) {
+        return execute(request, null);
+    }
+
+    private DefaultFullHttpRequest RocketRequest2NettyHttpRequest(RocketRequest rocketRequest) {
+        ByteBuf body = Unpooled.EMPTY_BUFFER;
+        if (rocketRequest.getBody() != null) {
+            body = Unpooled.wrappedBuffer(rocketRequest.getBody());
+        }
+        DefaultFullHttpRequest httpRequest = new DefaultFullHttpRequest(rocketRequest.getVersion(), rocketRequest.getMethod(), rocketRequest.getUri(), body);
+        HttpHeaders headers = httpRequest.headers();
+        if (rocketRequest.getHeaders() != null) {
+            headers.set(rocketRequest.getHeaders());
+        }
+        if (!headers.contains(HttpHeaderNames.HOST)) {
+            headers.set(HttpHeaderNames.HOST, rocketRequest.getHost());
+        }
+        if (!headers.contains(HttpHeaderNames.USER_AGENT)) {
+            headers.set(HttpHeaderNames.USER_AGENT, "RocketClient");
+        }
+        if (!headers.contains(HttpHeaderNames.ACCEPT)) {
+            headers.set(HttpHeaderNames.ACCEPT, "*/*");
+        }
+        return httpRequest;
     }
 
     @Override

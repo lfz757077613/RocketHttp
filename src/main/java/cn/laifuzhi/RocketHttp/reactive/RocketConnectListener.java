@@ -1,5 +1,6 @@
 package cn.laifuzhi.RocketHttp.reactive;
 
+import cn.laifuzhi.RocketHttp.model.RocketResponse;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -17,7 +18,7 @@ public final class RocketConnectListener implements ChannelFutureListener {
 
     @Override
     public void operationComplete(ChannelFuture future) throws Exception {
-        CompletableFuture<String> result = future.channel().attr(FUTURE).get();
+        CompletableFuture<RocketResponse> result = future.channel().attr(FUTURE).get();
         try {
             if (!future.isSuccess()) {
                 result.completeExceptionally(future.cause());

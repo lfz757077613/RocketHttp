@@ -1,5 +1,6 @@
 package cn.laifuzhi.RocketHttp.reactive;
 
+import cn.laifuzhi.RocketHttp.model.RocketResponse;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +18,7 @@ public final class RocketWriteListener implements ChannelFutureListener {
     @Override
     public void operationComplete(ChannelFuture future) throws Exception {
         if (!future.isSuccess()) {
-            CompletableFuture<String> result = future.channel().attr(FUTURE).get();
+            CompletableFuture<RocketResponse> result = future.channel().attr(FUTURE).get();
             result.completeExceptionally(future.cause());
             // isActive为false说明写入发生错误时，连接已经关闭
         }
