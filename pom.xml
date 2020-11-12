@@ -9,7 +9,7 @@
     <version>1.0-SNAPSHOT</version>
 
     <properties>
-        <netty.version>4.1.53.Final</netty.version>
+        <netty.version>4.1.54.Final</netty.version>
         <commons-pool.version>2.9.0</commons-pool.version>
         <lombok.version>1.18.16</lombok.version>
         <!-- logback中自带的slf4j就是1.7.25，本工程也使用这个版本，避免依赖冲突 -->
