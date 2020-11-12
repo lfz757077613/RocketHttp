@@ -11,7 +11,6 @@
     <properties>
         <netty.version>4.1.53.Final</netty.version>
         <commons-pool.version>2.9.0</commons-pool.version>
-        <guava.version>30.0-jre</guava.version>
         <lombok.version>1.18.16</lombok.version>
         <!-- logback中自带的slf4j就是1.7.25，本工程也使用这个版本，避免依赖冲突 -->
         <slf4j.version>1.7.25</slf4j.version>
@@ -31,12 +30,6 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-pool2</artifactId>
             <version>${commons-pool.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>${guava.version}</version>
         </dependency>
 
         <dependency>
@@ -68,21 +61,22 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <!-- logback配置文件不参与打包 -->
+                    <exclude>logback.xml</exclude>
+                </excludes>
+            </resource>
+        </resources>
+
         <plugins>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
-                </configuration>
-            </plugin>
-
-            <plugin>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <configuration>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
                 </configuration>
             </plugin>
 

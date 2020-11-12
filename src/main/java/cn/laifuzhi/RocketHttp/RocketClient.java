@@ -43,7 +43,6 @@ import org.apache.commons.pool2.impl.GenericKeyedObjectPoolConfig;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -129,7 +128,8 @@ public final class RocketClient implements Closeable {
         poolConfig.setMaxTotalPerKey(config.getMaxConnectPerHost());
         poolConfig.setMaxIdlePerKey(config.getMaxConnectPerHost());
         // 纯异步则不能阻塞了
-        poolConfig.setBlockWhenExhausted(false);
+        poolConfig.setBlockWhenExhausted(config.isBlockWhenExhausted());
+        poolConfig.setMaxWaitMillis(config.getBlockTimeout());
         poolConfig.setTestOnBorrow(true);
         // 每EvictIdleConnectPeriod秒清理一次空闲时间超过IdleConnectKeepAliveTime秒的连接，调用destroyObject
         poolConfig.setTimeBetweenEvictionRunsMillis(config.getEvictIdleConnectPeriod());
@@ -140,8 +140,8 @@ public final class RocketClient implements Closeable {
             @Override
             public RocketChannelWrapper create(String key) throws Exception {
                 log.debug("create key:{}", key);
-                List<String> hostPort = splitHostPort(key);
-                return new RocketChannelWrapper(true, false, bootstrap.connect(hostPort.get(0), Integer.parseInt(hostPort.get(1))));
+                String[] hostPort = splitHostPort(key);
+                return new RocketChannelWrapper(true, false, bootstrap.connect(hostPort[0], Integer.parseInt(hostPort[1])));
             }
 
             @Override
@@ -193,7 +193,7 @@ public final class RocketClient implements Closeable {
             Channel channel = channelWrapper.getConnectFuture().channel();
             channel.attr(FUTURE).set(result);
             channelWrapper.getConnectFuture().addListener(new RocketConnectListener(nettyHttpRequest));
-            // 设置请求的整体超时时间，如果是新建的连接，则包含连接时间
+            // 设置请求的整体超时时间(如果设置了阻塞，不包含等待连接的阻塞时间)，如果是新建的连接，则包含连接时间
             int requestTimeout = request.getTimeout() > 0 ? request.getTimeout() : config.getRequestTimeout();
             eventLoopGroup.schedule(() -> result.completeExceptionally(new TimeoutException("total timeout")), requestTimeout, TimeUnit.MILLISECONDS);
         } catch (Exception e) {

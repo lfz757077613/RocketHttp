@@ -15,6 +15,14 @@ public final class RocketConfig {
     private int maxConnectPerHost = 100;
     private int evictIdleConnectPeriod = 60 * 1000;
     private int idleConnectKeepAliveTime = 60 * 1000;
+    /**
+     * 获取不到连接时是否阻塞
+     */
+    private boolean blockWhenExhausted = false;
+    /**
+     * 获取不到连接时如果阻塞，阻塞时间，-1代表无限阻塞
+     */
+    private int blockTimeout = -1;
     private RocketConfig(){}
 
     public static RocketConfig defaultConfig() {

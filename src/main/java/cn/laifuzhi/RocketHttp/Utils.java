@@ -1,26 +1,26 @@
 package cn.laifuzhi.RocketHttp;
 
-
-import com.google.common.base.Joiner;
-import com.google.common.base.Splitter;
 import io.netty.channel.Channel;
 
-import java.util.List;
+import java.net.SocketAddress;
 
 public final class Utils {
-    private static final Joiner JOINER_UNDERLINE = Joiner.on("_").skipNulls();
-    private static final Joiner JOINER_COLON = Joiner.on(":").skipNulls();
-    private static final Splitter SPLITTER_COLON = Splitter.on(":").trimResults().omitEmptyStrings();
+    private static final String UNDERLINE = "_";
+    private static final String COLON = ":";
 
     public static String getSocketName(Channel channel) {
-        return JOINER_UNDERLINE.join(channel.remoteAddress(), channel.localAddress());
+        SocketAddress remoteAddress = channel.remoteAddress();
+        SocketAddress localAddress = channel.localAddress();
+        return String.join(UNDERLINE,
+                remoteAddress == null ? "" : remoteAddress.toString(),
+                localAddress == null ? "" : localAddress.toString());
     }
 
     public static String joinHostPort(String host, int port) {
-        return JOINER_COLON.join(host, port);
+        return String.join(COLON, host, String.valueOf(port));
     }
 
-    public static List<String> splitHostPort(String hostPort) {
-        return SPLITTER_COLON.splitToList(hostPort);
+    public static String[] splitHostPort(String hostPort) {
+        return hostPort.split(COLON);
     }
 }
