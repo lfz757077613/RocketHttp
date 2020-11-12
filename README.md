@@ -21,7 +21,7 @@ rocketClient.execute(RocketRequest.get("www.qq.com", 80, ""), new RocketDIYHandl
 
     @Override
     public void onThrowable(Throwable t) {
-        log.error("baidu", t);
+        log.error("error", t);
     }
 });
 // 同步调用
