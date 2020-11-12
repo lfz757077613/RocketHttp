@@ -26,5 +26,6 @@ rocketClient.execute(RocketRequest.get("www.qq.com", 80, ""), new RocketDIYHandl
 });
 // 同步调用
 RocketResponse rocketResponse = rocketClient.execute(RocketRequest.get("www.baidu.com", 80, "")).get();
-// 实际上execute方法返回的是CompletableFuture<RocketResponse>，如果不传入RocketDIYHandler可以自己处理CompletableFuture<RocketResponse>
+// 实际上execute方法返回的是CompletableFuture<RocketResponse>，如果不传入RocketDIYHandler可以自己处理future
+CompletableFuture<RocketResponse> future = rocketClient.execute(RocketRequest.get("www.qq.com", 80, ""))
 ```
