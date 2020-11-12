@@ -7,7 +7,7 @@
 - sync：最基础的同步http调用，每次请求都新建连接，阻塞等待连接完成后发出http请求，阻塞等待http响应
 - async：最基础的异步http调用，每次请求都新建连接，连接完成后回调发出http请求，不阻塞等待http响应，直接返回包含响应的promise，http响应后回调写入promise
 - syncPool：使用连接池同步http调用，每次从池中获取连接。如果没有可用连接则新建连接，阻塞等待连接完成后发出http请求，阻塞等待http响应
-- asyncPool：使用连接池异步http调用，每次从池中获取连接。如果没有可用连接则新建连接，连接完成后回调发出http请求，不阻塞等待http响应，直接返回包含响应的promise，http响应后回调写入promise
+- asyncPool：使用连接池异步http调用，每次从池中获取连接。如果没有可用连接则新建连接，连接完成后回调发出http请求，不阻塞等待http响应，直接返回CompletableFuture，http响应后回调写入CompletableFuture
 ### 使用示例
 ```
 // 异步调用
