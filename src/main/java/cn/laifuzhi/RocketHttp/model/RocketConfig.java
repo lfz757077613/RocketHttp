@@ -20,7 +20,7 @@ public final class RocketConfig {
      */
     private boolean blockWhenExhausted = false;
     /**
-     * 获取不到连接时如果阻塞，阻塞时间，-1代表无限阻塞
+     * 获取不到连接时如果阻塞的阻塞时间，-1代表无限阻塞
      */
     private int blockTimeout = -1;
     private RocketConfig(){}

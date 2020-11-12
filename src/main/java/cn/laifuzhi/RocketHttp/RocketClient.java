@@ -175,10 +175,10 @@ public final class RocketClient implements Closeable {
 
     public CompletableFuture<RocketResponse> execute(RocketRequest request, RocketDIYHandler diyHandler) {
         CompletableFuture<RocketResponse> result = new CompletableFuture<>();
-        if (diyHandler != null) {
-            result.whenCompleteAsync(new RocketDIYConsumer(diyHandler), eventLoopGroup);
-        }
         try {
+            if (diyHandler != null) {
+                result.whenCompleteAsync(new RocketDIYConsumer(diyHandler), eventLoopGroup);
+            }
             if (isClosed.get()) {
                 result.completeExceptionally(new IOException("RocketClient closed"));
                 return result;

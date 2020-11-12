@@ -20,7 +20,6 @@ public final class RocketWriteListener implements ChannelFutureListener {
         if (!future.isSuccess()) {
             CompletableFuture<RocketResponse> result = future.channel().attr(FUTURE).get();
             result.completeExceptionally(future.cause());
-            // isActive为false说明写入发生错误时，连接已经关闭
         }
     }
 }

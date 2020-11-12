@@ -61,22 +61,22 @@
     </dependencies>
 
     <build>
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-                <excludes>
-                    <!-- logback配置文件不参与打包 -->
-                    <exclude>logback.xml</exclude>
-                </excludes>
-            </resource>
-        </resources>
-
         <plugins>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
+                </configuration>
+            </plugin>
+
+            <!-- logback配置文件不参与打包 -->
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>logback.xml</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
 
