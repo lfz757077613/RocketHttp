@@ -125,9 +125,9 @@ public final class RocketClient implements Closeable {
                 });
 
         GenericKeyedObjectPoolConfig<RocketChannelWrapper> poolConfig = new GenericKeyedObjectPoolConfig<>();
+        poolConfig.setMaxTotal(config.getMaxConnect());
         poolConfig.setMaxTotalPerKey(config.getMaxConnectPerHost());
         poolConfig.setMaxIdlePerKey(config.getMaxConnectPerHost());
-        // 纯异步则不能阻塞了
         poolConfig.setBlockWhenExhausted(config.isBlockWhenExhausted());
         poolConfig.setMaxWaitMillis(config.getBlockTimeout());
         poolConfig.setTestOnBorrow(true);
