@@ -20,7 +20,8 @@ public class RocketClientTest {
         AtomicInteger completeCount = new AtomicInteger();
         AtomicInteger failCount = new AtomicInteger();
         AtomicInteger cancelCount = new AtomicInteger();
-        for (int i = 0; i < 2000; i++) {
+        for (;;) {
+            TimeUnit.MILLISECONDS.sleep(10);
             poolExecutor.execute(() -> {
                 try {
                     long start = System.currentTimeMillis();
@@ -40,6 +41,6 @@ public class RocketClientTest {
                 }
             });
         }
-        TimeUnit.HOURS.sleep(1);
+//        TimeUnit.HOURS.sleep(1);
     }
 }

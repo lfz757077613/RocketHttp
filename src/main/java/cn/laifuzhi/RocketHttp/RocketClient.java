@@ -15,7 +15,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
-import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.epoll.Epoll;
 import io.netty.channel.epoll.EpollEventLoopGroup;
@@ -83,8 +82,6 @@ public final class RocketClient implements Closeable {
     private final GenericKeyedObjectPool<String, RocketChannelWrapper> channelPool;
     private final AtomicBoolean isClosed = new AtomicBoolean(false);
     private final RocketNettyHandler rocketNettyHandler = new RocketNettyHandler();
-    // 负责处理请求超时和http请求的异步回调(包含调用用户自定义回调handler、归还或销毁channel)，不占用netty线程
-    private final DefaultEventLoopGroup eventLoopGroup = new DefaultEventLoopGroup();
 
     public RocketClient(RocketConfig config) {
         this.config = config;
@@ -177,7 +174,7 @@ public final class RocketClient implements Closeable {
         CompletableFuture<RocketResponse> result = new CompletableFuture<>();
         try {
             if (diyHandler != null) {
-                result.whenCompleteAsync(new RocketDIYConsumer(diyHandler), eventLoopGroup);
+                result.whenComplete(new RocketDIYConsumer(diyHandler));
             }
             if (isClosed.get()) {
                 result.completeExceptionally(new IOException("RocketClient closed"));
@@ -186,7 +183,7 @@ public final class RocketClient implements Closeable {
             DefaultFullHttpRequest nettyHttpRequest = RocketRequest2NettyHttpRequest(request);
             String channelKey = joinHostPort(request.getHost(), request.getPort());
             RocketChannelWrapper channelWrapper = channelPool.borrowObject(channelKey);
-            result.whenCompleteAsync(new RocketChannelConsumer(channelPool, channelWrapper, channelKey), eventLoopGroup);
+            result.whenComplete(new RocketChannelConsumer(channelPool, channelWrapper, channelKey));
             if (channelWrapper.isFirstUsed()) {
                 channelWrapper.setFirstUsed(false);
             }
@@ -195,7 +192,7 @@ public final class RocketClient implements Closeable {
             channelWrapper.getConnectFuture().addListener(new RocketConnectListener(nettyHttpRequest));
             // 设置请求的整体超时时间(如果设置了阻塞，不包含等待连接的阻塞时间)，如果是新建的连接，则包含连接时间
             int requestTimeout = request.getTimeout() > 0 ? request.getTimeout() : config.getRequestTimeout();
-            eventLoopGroup.schedule(() -> result.completeExceptionally(new TimeoutException("total timeout")), requestTimeout, TimeUnit.MILLISECONDS);
+            bootstrap.config().group().schedule(() -> result.completeExceptionally(new TimeoutException("total timeout")), requestTimeout, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
             result.completeExceptionally(e);
         }
@@ -233,7 +230,6 @@ public final class RocketClient implements Closeable {
         if (isClosed.compareAndSet(false, true)) {
             log.info("RocketClient closing...");
             bootstrap.config().group().shutdownGracefully().syncUninterruptibly();
-            eventLoopGroup.shutdownGracefully();
             channelPool.close();
         }
     }
