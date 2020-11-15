@@ -18,7 +18,8 @@ public final class RocketChannelConsumer implements BiConsumer<RocketResponse, T
     @Override
     public void accept(RocketResponse resp, Throwable throwable) {
         try {
-            // resp和throwable只会有一个有值
+            // resp和throwable只会有一个有值，只有正常获得http响应的连接才会归还连接池复用，否则可能有各种并发问题
+            // PS: 请求1，发生错误 -> 归还连接 -> 获取连接发出请求2 -> 请求1响应 -> 会把请求1的响应当做请求2的响应
             if (resp != null) {
                 channelPool.returnObject(channelKey, channelWrapper);
             }

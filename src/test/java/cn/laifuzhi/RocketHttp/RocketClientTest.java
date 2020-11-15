@@ -39,7 +39,7 @@ public class RocketClientTest {
                         public void onThrowable(Throwable t) {
                             log.info("fail count:{}", failCount.incrementAndGet());
                         }
-                    }).get();
+                    });
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
