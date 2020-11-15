@@ -6,15 +6,19 @@ import cn.laifuzhi.RocketHttp.model.RocketRequest;
 import cn.laifuzhi.RocketHttp.model.RocketResponse;
 import cn.laifuzhi.RocketHttp.reactive.RocketDIYHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.Test;
 
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 
 @Slf4j
 public class RocketClientTest {
-    public static void main(String[] args) throws Exception {
+    @Test
+    public void test() throws Exception {
         ThreadPoolExecutor poolExecutor = new ThreadPoolExecutor(80, 80, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(2000));
         RocketClient rocketClient = new RocketClient(RocketConfig.defaultConfig());
         AtomicInteger completeCount = new AtomicInteger();

@@ -48,7 +48,7 @@ public final class RocketNettyHandler extends SimpleChannelInboundHandler<FullHt
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        log.error("exceptionCaught channel:{}", getSocketName(ctx.channel()));
+        log.debug("exceptionCaught channel:{}", getSocketName(ctx.channel()));
         CompletableFuture<RocketResponse> result = ctx.channel().attr(FUTURE).get();
         if (result != null) {
             result.completeExceptionally(cause);

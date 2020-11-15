@@ -167,7 +167,6 @@ public final class RocketClient implements Closeable {
                 return p.getObject().isFirstUsed() || p.getObject().getConnectFuture().channel().isActive();
             }
         }, poolConfig);
-        Runtime.getRuntime().addShutdownHook(new Thread(this::close));
     }
 
     public CompletableFuture<RocketResponse> execute(RocketRequest request, RocketDIYHandler diyHandler) {
