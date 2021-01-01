@@ -10,15 +10,30 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
-        <netty.version>4.1.54.Final</netty.version>
+        <!-- 全部使用当前最新稳定版第三方依赖jar start -->
+        <netty.version>4.1.56.Final</netty.version>
         <commons-pool.version>2.9.0</commons-pool.version>
         <lombok.version>1.18.16</lombok.version>
         <!-- logback中自带的slf4j就是1.7.25，本工程也使用这个版本，避免依赖冲突 -->
         <slf4j.version>1.7.25</slf4j.version>
         <logback.version>1.2.3</logback.version>
         <junit.version>4.13.1</junit.version>
+        <!-- 第三方依赖jar end -->
+        <!-- 全部使用当前最新稳定版maven插件 start -->
+        <os-maven-plugin.version>1.6.2</os-maven-plugin.version>
+        <maven-clean-plugin.version>3.1.0</maven-clean-plugin.version>
+        <maven-resources-plugin.version>3.2.0</maven-resources-plugin.version>
+        <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
+        <maven-jar-plugin.version>3.2.0</maven-jar-plugin.version>
+        <maven-shade-plugin.version>3.2.4</maven-shade-plugin.version>
+        <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
+        <maven-install-plugin.version>3.0.0-M1</maven-install-plugin.version>
+        <maven-deploy-plugin.version>3.0.0-M1</maven-deploy-plugin.version>
+        <!-- maven插件 end -->
     </properties>
 
     <dependencies>
@@ -62,13 +77,49 @@
         </dependency>
     </dependencies>
 
+    <!-- maven3中推荐指定插件版本否则有warn警告，否则会用超级pom中指定的版本或者当前最新release版，maven后续版本的super pom中可能不指定版本-->
+    <!-- 所以本工程将所有使用到的maven插件全部指定了版本-->
+    <!-- 全部使用当前最新稳定版maven插件 -->
     <build>
+<!-- ${os.detected.classifier} -->
+<!--        <extensions>-->
+<!--            <extension>-->
+<!--                <groupId>kr.motd.maven</groupId>-->
+<!--                <artifactId>os-maven-plugin</artifactId>-->
+<!--                <version>${os-maven-plugin.version}</version>-->
+<!--            </extension>-->
+<!--        </extensions>-->
         <plugins>
+            <!-- 按照maven执行顺序定义 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-clean-plugin</artifactId>
+                <version>${maven-clean-plugin.version}</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>${maven-resources-plugin.version}</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+            </plugin>
+
             <!-- logback配置文件不参与打包 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
-                <version>3.2.0</version>
+                <version>${maven-jar-plugin.version}</version>
                 <configuration>
                     <excludes>
                         <exclude>logback.xml</exclude>
@@ -76,13 +127,17 @@
                 </configuration>
             </plugin>
 
+            <!--
+                在package的时候就生成源码包，并且要在shade插件的配置前面，保证shade插件执行时，已经有生成了本工程的源码包
+                否则shade生成的源码包只会包含被shade引进来的jar的源码，不会包含本工程的源码
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.2.1</version>
+                <version>${maven-source-plugin.version}</version>
                 <executions>
                     <execution>
-                        <phase>verify</phase>
+                        <phase>package</phase>
                         <goals>
                             <goal>jar-no-fork</goal>
                         </goals>
@@ -90,40 +145,81 @@
                 </executions>
             </plugin>
 
-<!--            <plugin>-->
-<!--                <groupId>org.apache.maven.plugins</groupId>-->
-<!--                <artifactId>maven-shade-plugin</artifactId>-->
-<!--                <version>3.2.4</version>-->
-<!--                <executions>-->
-<!--                    <execution>-->
-<!--                        <phase>package</phase>-->
-<!--                        <goals>-->
-<!--                            <goal>shade</goal>-->
-<!--                        </goals>-->
-<!--                    </execution>-->
-<!--                </executions>-->
-<!--                <configuration>-->
-<!--                    <keepDependenciesWithProvidedScope>false</keepDependenciesWithProvidedScope>-->
-<!--                    <promoteTransitiveDependencies>false</promoteTransitiveDependencies>-->
-<!--                    <createDependencyReducedPom>true</createDependencyReducedPom>-->
-<!--                    <minimizeJar>false</minimizeJar>-->
-<!--                    <createSourcesJar>true</createSourcesJar>-->
-<!--                    <shadeSourcesContent>true</shadeSourcesContent>-->
-<!--                    <artifactSet>-->
-<!--                        <includes>-->
-<!--                            <include>com.alibaba:fastjson</include>-->
-<!--                            <include>io.netty:netty-all</include>-->
-<!--                            <include>io.prometheus:*</include>-->
-<!--                        </includes>-->
-<!--                    </artifactSet>-->
-<!--                    <relocations>-->
-<!--                        <relocation>-->
-<!--                            <pattern>io.netty</pattern>-->
-<!--                            <shadedPattern>xxx.io.netty</shadedPattern>-->
-<!--                        </relocation>-->
-<!--                    </relocations>-->
-<!--                </configuration>-->
-<!--            </plugin>-->
+            <!-- 默认生成shade之后的dependency-reduced-pom.xml，使用方看到的也是这个pom -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven-shade-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <!--
+                                artifactSet的依赖在dependency-reduced-pom.xml设置为provided，
+                                主要是为了让使用方直接就能知道具体的依赖版本，不用看源码里的真正pom文件
+                            -->
+                            <keepDependenciesWithProvidedScope>true</keepDependenciesWithProvidedScope>
+                            <!-- 生成shade之后的jar包的源码 -->
+                            <createSourcesJar>true</createSourcesJar>
+                            <!-- 如果不设置true，shade源码包里import的还是依赖jar的类 -->
+                            <shadeSourcesContent>true</shadeSourcesContent>
+                            <!-- 将netty和对象池这两个jar的代码拷贝到shade后的jar里 -->
+                            <artifactSet>
+                                <includes>
+                                    <include>io.netty:netty-all</include>
+                                    <include>org.apache.commons:commons-pool2</include>
+                                </includes>
+                            </artifactSet>
+                            <!-- 将netty和对象池这两个jar的MANIFEST.MF排除掉，最后shade的jar里只有本工程的MANIFEST.MF -->
+                            <filters>
+                                <filter>
+                                    <artifact>io.netty:netty-all</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>org.apache.commons:commons-pool2</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <!-- 将netty和对象池这两个拷贝到shade后的jar里的代码进行包名转换，避免类名冲突 -->
+                            <!--
+                                使用shade集成netty之后，如果要使用native能力，需要把本地库名字改成relocations中的规则一样
+                                所以本工程将netty-all/META-INF/native中的本地库复制了一份并重命名放在了META-INF/native下
+                                这样使用方才能加载到本地库使用native能力
+                            -->
+                            <relocations>
+                                <relocation>
+                                    <pattern>io.netty</pattern>
+                                    <shadedPattern>cn.laifuzhi.shade.io.netty</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.apache.commons.pool2</pattern>
+                                    <shadedPattern>cn.laifuzhi.shade.commons.pool2</shadedPattern>
+                                </relocation>
+                            </relocations>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-install-plugin</artifactId>
+                <version>${maven-install-plugin.version}</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <version>${maven-deploy-plugin.version}</version>
+            </plugin>
         </plugins>
     </build>
 </project>
