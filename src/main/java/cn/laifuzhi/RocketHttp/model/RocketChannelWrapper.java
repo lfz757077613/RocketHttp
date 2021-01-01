@@ -11,8 +11,6 @@ import lombok.Setter;
 public final class RocketChannelWrapper {
     // create后，channelFuture中的channel可能还没有连接完成，isActive还是false
     private volatile boolean firstUsed;
-    // destroyObject后，channelFuture中的channel可能还没有close完成，isActive还是true
-    private volatile boolean destroyed;
     private ChannelFuture connectFuture;
 
 }

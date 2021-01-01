@@ -138,7 +138,7 @@ public final class RocketClient implements Closeable {
             public RocketChannelWrapper create(String key) throws Exception {
                 log.debug("create key:{}", key);
                 String[] hostPort = splitHostPort(key);
-                return new RocketChannelWrapper(true, false, bootstrap.connect(hostPort[0], Integer.parseInt(hostPort[1])));
+                return new RocketChannelWrapper(true, bootstrap.connect(hostPort[0], Integer.parseInt(hostPort[1])));
             }
 
             @Override
@@ -150,8 +150,6 @@ public final class RocketClient implements Closeable {
             public void destroyObject(String key, PooledObject<RocketChannelWrapper> p) throws Exception {
                 log.debug("destroyObject key:{} channel:{}", key, getSocketName(p.getObject().getConnectFuture().channel()));
                 // 纯异步则不能阻塞，close也就不能调用syncUninterruptibly()
-                // 所以执行完destroyObject后，可能channel的isActive仍为true
-                p.getObject().setDestroyed(true);
                 p.getObject().getConnectFuture().channel().close();
             }
 
@@ -159,11 +157,8 @@ public final class RocketClient implements Closeable {
             public boolean validateObject(String key, PooledObject<RocketChannelWrapper> p) {
                 // 当设置了testOnBorrow为true的话，会对makeObject新建的对象调用validateObject，如果false则会抛出异常
                 // 所以当isFirstUsed时(刚刚创建的连接)，validateObject直接返回true
-                log.debug("validateObject key:{} firstUsed:{} destroyed:{} channel:{}",
-                        key, p.getObject().isFirstUsed(), p.getObject().isDestroyed(), getSocketName(p.getObject().getConnectFuture().channel()));
-                if (p.getObject().isDestroyed()) {
-                    return false;
-                }
+                log.debug("validateObject key:{} firstUsed:{} channel:{}",
+                        key, p.getObject().isFirstUsed(), getSocketName(p.getObject().getConnectFuture().channel()));
                 return p.getObject().isFirstUsed() || p.getObject().getConnectFuture().channel().isActive();
             }
         }, poolConfig);
@@ -186,8 +181,7 @@ public final class RocketClient implements Closeable {
             if (channelWrapper.isFirstUsed()) {
                 channelWrapper.setFirstUsed(false);
             }
-            Channel channel = channelWrapper.getConnectFuture().channel();
-            channel.attr(FUTURE).set(result);
+            channelWrapper.getConnectFuture().channel().attr(FUTURE).set(result);
             channelWrapper.getConnectFuture().addListener(new RocketConnectListener(nettyHttpRequest));
             // 设置请求的整体超时时间(如果设置了阻塞，不包含等待连接的阻塞时间)，如果是新建的连接，则包含连接时间
             int requestTimeout = request.getTimeout() > 0 ? request.getTimeout() : config.getRequestTimeout();
