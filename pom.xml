@@ -145,7 +145,10 @@
                 </executions>
             </plugin>
 
-            <!-- 默认生成shade之后的dependency-reduced-pom.xml，使用方看到的也是这个pom -->
+            <!--
+                默认生成shade之后的dependency-reduced-pom.xml，使用方直接在pom里点进来看到的也是这个pom
+                除非看META-INF或者源码才能看到原始pom
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
