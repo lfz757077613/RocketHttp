@@ -20,7 +20,8 @@
         <!-- 自定义配置项 start -->
         <classesShadedDir>${project.build.directory}/classes-shaded</classesShadedDir>
         <classesShadedNativeDir>${classesShadedDir}/META-INF/native</classesShadedNativeDir>
-        <shadingPrefix>rockethttp_shade</shadingPrefix>
+        <!-- shadingPrefix只能一个单词并且不能有_，否则antrun插件处理native时有问题 -->
+        <shadingPrefix>rockethttpshade</shadingPrefix>
         <jarName>${project.build.finalName}.${project.packaging}</jarName>
         <!-- 自定义配置项 end -->
 
