@@ -79,13 +79,40 @@
               <relocations>
                 <relocation>
                   <pattern>io.netty</pattern>
-                  <shadedPattern>cn.laifuzhi.shade.io.netty</shadedPattern>
+                  <shadedPattern>${shadingPrefix}.io.netty</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>org.apache.commons.pool2</pattern>
-                  <shadedPattern>cn.laifuzhi.shade.commons.pool2</shadedPattern>
+                  <shadedPattern>${shadingPrefix}.org.apache.commons.pool2</shadedPattern>
                 </relocation>
               </relocations>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>${maven-antrun-plugin.version}</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <unzip>
+                  <fileset>
+                    <include />
+                  </fileset>
+                </unzip>
+                <move />
+                <move />
+                <move />
+                <move />
+                <jar />
+                <delete />
+              </target>
             </configuration>
           </execution>
         </executions>
@@ -154,17 +181,22 @@
     <maven-clean-plugin.version>3.1.0</maven-clean-plugin.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>1.8</maven.compiler.source>
+    <shadingPrefix>rockethttp_shade</shadingPrefix>
     <junit.version>4.13.1</junit.version>
     <netty.version>4.1.56.Final</netty.version>
     <commons-pool.version>2.9.0</commons-pool.version>
+    <jarName>${project.build.finalName}.${project.packaging}</jarName>
+    <classesShadedNativeDir>${classesShadedDir}/META-INF/native</classesShadedNativeDir>
     <logback.version>1.2.3</logback.version>
     <slf4j.version>1.7.25</slf4j.version>
     <maven-shade-plugin.version>3.2.4</maven-shade-plugin.version>
-    <maven.compiler.target>1.8</maven.compiler.target>
     <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
+    <maven.compiler.target>1.8</maven.compiler.target>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <maven-deploy-plugin.version>3.0.0-M1</maven-deploy-plugin.version>
     <maven-install-plugin.version>3.0.0-M1</maven-install-plugin.version>
     <maven-jar-plugin.version>3.2.0</maven-jar-plugin.version>
+    <classesShadedDir>${project.build.directory}/classes-shaded</classesShadedDir>
+    <maven-antrun-plugin.version>3.0.0</maven-antrun-plugin.version>
   </properties>
 </project>

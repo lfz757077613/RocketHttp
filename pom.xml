@@ -7,12 +7,23 @@
     <groupId>cn.laifuzhi</groupId>
     <artifactId>RocketHttp</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
 
     <properties>
+        <!-- maven插件使用的官方配置项 start -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <!-- maven插件使用的官方配置项 end -->
+
+        <!-- 自定义配置项 start -->
+        <classesShadedDir>${project.build.directory}/classes-shaded</classesShadedDir>
+        <classesShadedNativeDir>${classesShadedDir}/META-INF/native</classesShadedNativeDir>
+        <shadingPrefix>rockethttp_shade</shadingPrefix>
+        <jarName>${project.build.finalName}.${project.packaging}</jarName>
+        <!-- 自定义配置项 end -->
+
         <!-- 全部使用当前最新稳定版第三方依赖jar start -->
         <netty.version>4.1.56.Final</netty.version>
         <commons-pool.version>2.9.0</commons-pool.version>
@@ -22,6 +33,7 @@
         <logback.version>1.2.3</logback.version>
         <junit.version>4.13.1</junit.version>
         <!-- 第三方依赖jar end -->
+
         <!-- 全部使用当前最新稳定版maven插件 start -->
         <os-maven-plugin.version>1.6.2</os-maven-plugin.version>
         <maven-clean-plugin.version>3.1.0</maven-clean-plugin.version>
@@ -29,8 +41,9 @@
         <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
         <maven-jar-plugin.version>3.2.0</maven-jar-plugin.version>
-        <maven-shade-plugin.version>3.2.4</maven-shade-plugin.version>
         <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
+        <maven-shade-plugin.version>3.2.4</maven-shade-plugin.version>
+        <maven-antrun-plugin.version>3.0.0</maven-antrun-plugin.version>
         <maven-install-plugin.version>3.0.0-M1</maven-install-plugin.version>
         <maven-deploy-plugin.version>3.0.0-M1</maven-deploy-plugin.version>
         <!-- maven插件 end -->
@@ -192,21 +205,54 @@
                                 </filter>
                             </filters>
                             <!-- 将netty和对象池这两个拷贝到shade后的jar里的代码进行包名转换，避免类名冲突 -->
-                            <!--
-                                使用shade集成netty之后，如果要使用native能力，需要把本地库名字改成relocations中的规则一样
-                                所以本工程将netty-all/META-INF/native中的本地库复制了一份并重命名放在了META-INF/native下
-                                这样使用方才能加载到本地库使用native能力
-                            -->
                             <relocations>
                                 <relocation>
                                     <pattern>io.netty</pattern>
-                                    <shadedPattern>cn.laifuzhi.shade.io.netty</shadedPattern>
+                                    <shadedPattern>${shadingPrefix}.io.netty</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.commons.pool2</pattern>
-                                    <shadedPattern>cn.laifuzhi.shade.commons.pool2</shadedPattern>
+                                    <shadedPattern>${shadingPrefix}.org.apache.commons.pool2</shadedPattern>
                                 </relocation>
                             </relocations>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!--
+                使用shade集成netty之后，如果要使用native能力，需要把本地库名字改成relocations中的规则一样
+                所以本工程参考netty官方测试对shade之后的native支持测试使用的配置，这样使用方才能加载到本地库使用native能力
+                https://github.com/netty/netty/blob/4.1/testsuite-shading/pom.xml
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>${maven-antrun-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <unzip dest="${classesShadedDir}">
+                                    <fileset dir="${project.build.directory}">
+                                        <include name="${jarName}"/>
+                                    </fileset>
+                                </unzip>
+                                <move file="${classesShadedNativeDir}/libnetty_resolver_dns_native_macos_x86_64.jnilib"
+                                      tofile="${classesShadedNativeDir}/lib${shadingPrefix}_netty_resolver_dns_native_macos_x86_64.jnilib"/>
+                                <move file="${classesShadedNativeDir}/libnetty_transport_native_epoll_aarch_64.so"
+                                      tofile="${classesShadedNativeDir}/lib${shadingPrefix}_netty_transport_native_epoll_aarch_64.so"/>
+                                <move file="${classesShadedNativeDir}/libnetty_transport_native_epoll_x86_64.so"
+                                      tofile="${classesShadedNativeDir}/lib${shadingPrefix}_netty_transport_native_epoll_x86_64.so"/>
+                                <move file="${classesShadedNativeDir}/libnetty_transport_native_kqueue_x86_64.jnilib"
+                                      tofile="${classesShadedNativeDir}/lib${shadingPrefix}_netty_transport_native_kqueue_x86_64.jnilib"/>
+                                <jar destfile="${project.build.directory}/${jarName}" basedir="${classesShadedDir}"/>
+                                <delete dir="${classesShadedDir}"/>
+                            </target>
                         </configuration>
                     </execution>
                 </executions>
