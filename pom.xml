@@ -224,6 +224,7 @@
             <!--
                 使用shade集成netty之后，如果要使用native能力，需要把本地库名字改成relocations中的规则一样
                 所以本工程参考netty官方测试对shade之后的native支持测试使用的配置，这样使用方才能加载到本地库使用native能力
+                https://github.com/netty/netty/issues/8090
                 https://github.com/netty/netty/blob/4.1/testsuite-shading/pom.xml
             -->
             <plugin>
