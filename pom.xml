@@ -20,7 +20,8 @@
         <classesShadedDir>${project.build.directory}/classes-shaded</classesShadedDir>
         <classesShadedNativeDir>${classesShadedDir}/META-INF/native</classesShadedNativeDir>
         <!-- shadingPrefix只能一个单词并且不能有_和.(最好纯字母)，否则antrun插件处理native时有问题 -->
-        <shadingPrefix>rockethttpshade</shadingPrefix>
+        <shadingPackagePrefix>lfz.shade</shadingPackagePrefix>
+        <shadingFilePrefix>lfz_shade</shadingFilePrefix>
         <jarName>${project.build.finalName}.${project.packaging}</jarName>
         <!-- 自定义配置项 end -->
 
@@ -208,11 +209,11 @@
                             <relocations>
                                 <relocation>
                                     <pattern>io.netty</pattern>
-                                    <shadedPattern>${shadingPrefix}.io.netty</shadedPattern>
+                                    <shadedPattern>${shadingPackagePrefix}.io.netty</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.apache.commons.pool2</pattern>
-                                    <shadedPattern>${shadingPrefix}.org.apache.commons.pool2</shadedPattern>
+                                    <shadedPattern>${shadingPackagePrefix}.org.apache.commons.pool2</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
@@ -244,13 +245,13 @@
                                     </fileset>
                                 </unzip>
                                 <move file="${classesShadedNativeDir}/libnetty_resolver_dns_native_macos_x86_64.jnilib"
-                                      tofile="${classesShadedNativeDir}/lib${shadingPrefix}_netty_resolver_dns_native_macos_x86_64.jnilib"/>
+                                      tofile="${classesShadedNativeDir}/lib${shadingFilePrefix}_netty_resolver_dns_native_macos_x86_64.jnilib"/>
                                 <move file="${classesShadedNativeDir}/libnetty_transport_native_epoll_aarch_64.so"
-                                      tofile="${classesShadedNativeDir}/lib${shadingPrefix}_netty_transport_native_epoll_aarch_64.so"/>
+                                      tofile="${classesShadedNativeDir}/lib${shadingFilePrefix}_netty_transport_native_epoll_aarch_64.so"/>
                                 <move file="${classesShadedNativeDir}/libnetty_transport_native_epoll_x86_64.so"
-                                      tofile="${classesShadedNativeDir}/lib${shadingPrefix}_netty_transport_native_epoll_x86_64.so"/>
+                                      tofile="${classesShadedNativeDir}/lib${shadingFilePrefix}_netty_transport_native_epoll_x86_64.so"/>
                                 <move file="${classesShadedNativeDir}/libnetty_transport_native_kqueue_x86_64.jnilib"
-                                      tofile="${classesShadedNativeDir}/lib${shadingPrefix}_netty_transport_native_kqueue_x86_64.jnilib"/>
+                                      tofile="${classesShadedNativeDir}/lib${shadingFilePrefix}_netty_transport_native_kqueue_x86_64.jnilib"/>
                                 <jar destfile="${project.build.directory}/${jarName}" basedir="${classesShadedDir}"/>
                                 <delete dir="${classesShadedDir}"/>
                             </target>
